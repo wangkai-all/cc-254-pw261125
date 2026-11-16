@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>采集核验工作台</title>
+<style>
+  :root {
+    --bg: #0f141b; --panel: #18202b; --panel2: #1f2937;
+    --text: #e6ebf2; --muted: #93a1b3; --line: #2b3848;
+    --green: #34d399; --amber: #fbbf24; --red: #f87171;
+    --blue: #60a5fa; --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; }
+  header { padding:18px 28px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; }
+  header .sub { color:var(--muted); font-size:13px; }
+  main { padding:22px 28px; max-width:1280px; margin:0 auto; }
+  .grid { display:grid; gap:16px; }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  @media (max-width:980px){ .cols-3,.cols-2{grid-template-columns:1fr;} }
+  .card { background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:16px 18px; }
+  .card h2 { margin:0 0 10px; font-size:15px; color:var(--muted);
+    font-weight:600; letter-spacing:.04em; }
+  .stat { font-size:30px; font-weight:700; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:999px;
+    font-size:12px; font-weight:600; }
+  .b-green{background:rgba(52,211,153,.15);color:var(--green);border:1px solid rgba(52,211,153,.4);}
+  .b-amber{background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.4);}
+  .b-red{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.4);}
+  .b-blue{background:rgba(96,165,250,.15);color:var(--blue);border:1px solid rgba(96,165,250,.4);}
+  .b-violet{background:rgba(167,139,250,.15);color:var(--violet);border:1px solid rgba(167,139,250,.4);}
+  .b-gray{background:rgba(147,161,179,.15);color:var(--muted);border:1px solid var(--line);}
+  button { background:var(--blue); color:#0b1220; border:0; border-radius:8px;
+    padding:8px 14px; font-weight:600; cursor:pointer; font-size:13px; }
+  button.ghost { background:transparent; color:var(--text);
+    border:1px solid var(--line); }
+  button.danger { background:var(--red); color:#1a0b0b; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  input,select { background:var(--panel2); border:1px solid var(--line);
+    color:var(--text); border-radius:8px; padding:7px 10px; font-size:13px; width:100%; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .row > div { flex:1; min-width:110px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line);
+    vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .meter { height:8px; background:var(--panel2); border-radius:999px; overflow:hidden; margin-top:5px;}
+  .meter > i { display:block; height:100%; background:var(--blue); }
+  .meter.warn > i { background:var(--amber); }
+  .meter.over > i { background:var(--red); }
+  .section-title { display:flex; align-items:center; gap:10px; margin:22px 0 10px; }
+  .section-title h2 { margin:0; font-size:16px; }
+  .pill { font-size:12px; color:var(--muted); }
+  details { margin-top:6px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:12px; }
+  pre { background:#0b1118; border:1px solid var(--line); border-radius:8px;
+    padding:10px; overflow:auto; font-size:11.5px; max-height:260px; }
+  .note { border-left:3px solid var(--amber); padding:8px 12px;
+    background:rgba(251,191,36,.07); border-radius:0 8px 8px 0;
+    color:#d8c9a3; font-size:12.5px; margin-top:10px; }
+  .note.blue { border-color:var(--blue); background:rgba(96,165,250,.07); color:#b8cff2;}
+  .toast { position:fixed; right:22px; bottom:22px; max-width:420px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:12px 16px; display:none; white-space:pre-wrap; z-index:9; }
+  .toast.err { border-color:var(--red); }
+  .mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>采集核验工作台</h1>
+  <span class="sub">分页采集 · 区间数量+内容摘要核验 · 限定补抓 · 版本钉选 · 可恢复</span>
+  <span style="flex:1"></span>
+  <span class="sub">来源当前版本：<b id="srcVer" class="mono">-</b></span>
+  <span class="sub">来源请求计数：<b id="srcCnt" class="mono">-</b></span>
+  <button class="ghost" onclick="refresh()">刷新</button>
+</header>
+
+<main>
+  <!-- 控制区 -->
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>发起采集 + 核验 RUN（同一来源版本内完成）</h2>
+      <div class="row">
+        <div>
+          <label>核验模式</label>
+          <select id="mode">
+            <option value="full">全量核验（每区间都请求 count+digest）</option>
+            <option value="sample">抽检（约 50% 区间做权威核验）</option>
+          </select>
+        </div>
+        <div><label>抽检率（sample 模式）</label>
+          <input id="sampleRate" type="number" min="0.1" max="1" step="0.1" value="0.5"></div>
+      </div>
+      <div class="row">
+        <div><label>预算：分页采集请求上限</label><input id="bRows" type="number" value="60"></div>
+        <div><label>预算：权威核验请求上限</label><input id="bVerify" type="number" value="40"></div>
+        <div><label>预算：补抓请求上限</label><input id="bRefetch" type="number" value="20"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button onclick="startRun()">开始 RUN</button>
+        <button class="ghost" onclick="resumeRun()">恢复中断 RUN</button>
+        <button class="ghost" onclick="discardRun()">放弃中断 RUN</button>
+        <button class="ghost" onclick="baselineCheck()">独立基准对照</button>
+      </div>
+      <div class="note blue">
+        预算说明：采集口 <span class="mono">/rows</span> 按页计费，核验口
+        <span class="mono">/count</span>+<span class="mono">/digest</span>
+        按区间计费，补抓只重抓<b>可疑区间覆盖的页</b>并单独设上限与熔断比例。
+        任何一本预算耗尽即优雅中止，已取得的证明保留，但不得扩大结论。
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>来源故障 / 版本注入（HTTP 状态码始终为 200）</h2>
+      <div class="row">
+        <div>
+          <label>切换来源版本</label>
+          <select id="setVer"><option value="v1">v1</option><option value="v2">v2</option></select>
+        </div>
+        <div style="flex:0 0 auto"><button onclick="setVersion()">换版</button></div>
+      </div>
+      <div class="row">
+        <div><label>缺页：offset</label><input id="fOffset" type="number" value="0"></div>
+        <div><label>limit</label><input id="fLimit" type="number" value="50"></div>
+        <div><label>指定丢失 id（逗号，可空=丢首行）</label><input id="fIds" placeholder="如 3,7"></div>
+        <div style="flex:0 0 auto"><label>一次性</label>
+          <select id="fOnce"><option value="true">是</option><option value="false">否</option></select></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="danger" onclick="injectDrop()">注入缺页</button>
+        <button class="danger" onclick="injectStale()">注入旧缓存</button>
+        <button class="ghost" onclick="clearFaults()">清除故障</button>
+      </div>
+      <div class="row">
+        <div><label>途中自动换版：第 N 次 /rows 后</label><input id="driftAfter" type="number" value="10"></div>
+        <div><label>换到</label><select id="driftVer"><option value="v2">v2</option><option value="v1">v1</option></select></div>
+        <div style="flex:0 0 auto"><button onclick="setDrift()">设置漂移</button></div>
+        <div style="flex:0 0 auto"><button class="ghost" onclick="resetCounters()">清零来源计数</button></div>
+      </div>
+      <div class="note">
+        换版后，旧版本的 ACTIVE 证明会立即变为 <span class="badge b-gray">STALE</span>；
+        正在进行的 RUN 下次权威核验发现版本不一致即中止（采集与核验必须基于同一来源版本）。
+      </div>
+    </div>
+  </div>
+
+  <!-- RUN 状态与预算 -->
+  <div class="section-title"><h2>最近 RUN</h2><span class="pill" id="runHint"></span></div>
+  <div class="card">
+    <table id="runsTable"><thead><tr>
+      <th>run</th><th>模式</th><th>钉选版本</th><th>状态</th><th>行数</th>
+      <th>采集预算</th><th>核验预算</th><th>补抓预算</th><th>说明</th><th></th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+
+  <!-- 三类结论分区 -->
+  <div class="section-title"><h2>区间结论</h2>
+    <span class="pill">三类口径严格区分，抽检通过不得宣称全量完整</span></div>
+  <div class="grid cols-3">
+    <div class="card" style="border-top:3px solid var(--green)">
+      <h2>✅ 已证明完整 <span class="badge b-green" id="cProven">0</span></h2>
+      <div class="muted">通过权威 count + digest 核验（含补抓后复核通过）</div>
+      <div id="provenList" class="chips" style="margin-top:8px"></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--amber)">
+      <h2>⚠️ 抽检未见异常 <span class="badge b-amber" id="cSampled">0</span></h2>
+      <div class="muted">本 RUN 未对该区间发起权威核验，<b>不等于完整</b></div>
+      <div id="sampledList" class="chips" style="margin-top:8px"></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--red)">
+      <h2>❌ 确认缺口 <span class="badge b-red" id="cGap">0</span></h2>
+      <div class="muted">补抓预算/轮数用尽后仍与权威不一致，含未决熔断区间</div>
+      <div id="gapList" class="chips" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- 区间明细表 -->
+  <div class="section-title"><h2>区间状态机明细</h2><span class="pill" id="detailHint"></span></div>
+  <div class="card">
+    <table id="rangeTable"><thead><tr>
+      <th>区间 [lo,hi)</th><th>状态</th><th>数量 本地/权威</th>
+      <th>摘要</th><th>补抓轮数</th><th>详情</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+
+  <!-- 证明记录 -->
+  <div class="section-title"><h2>证明记录</h2>
+    <span class="pill">换版后旧证明 STALE；COMPLETE / SAMPLED / GAP 三类不可互相替代</span></div>
+  <div class="card">
+    <table id="proofTable"><thead><tr>
+      <th>proof</th><th>run</th><th>类型</th><th>状态</th><th>版本</th>
+      <th>区间</th><th>详情</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h2>准确性 vs 请求成本</h2>
+    <div class="muted">
+      全量核验对每个区间调用 2 次权威接口，结论可覆盖全部区间；
+      抽检只对部分区间付费，未抽中区间只能归入"抽检未见异常"。
+      补抓限定在可疑区间并设轮数/预算/熔断上限——既不因一次疑点全表重抓，
+      也不允许无限重试。基准对照（独立读取基准文件，不走来源 HTTP）可随时复核结论真伪。
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let lastRuns = [];
+
+function toast(msg, isErr){
+  const t = $("toast"); t.textContent = msg; t.style.display="block";
+  t.className = "toast" + (isErr ? " err" : "");
+  setTimeout(()=>t.style.display="none", 5000);
+}
+async function api(path, opts){
+  const resp = await fetch(path, opts || {});
+  const data = await resp.json().catch(()=>({}));
+  if(!resp.ok) throw new Error(data.error || ("HTTP "+resp.status));
+  return data;
+}
+const post = (path, body) => api(path, {method:"POST",
+  headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{})});
+
+function budgetCell(used, cap){
+  const pct = cap ? Math.min(100, used/cap*100) : 0;
+  const cls = used >= cap ? "over" : (pct > 70 ? "warn" : "");
+  return `<div class="mono">${used}/${cap}</div><div class="meter ${cls}"><i style="width:${pct}%"></i></div>`;
+}
+const runBadge = s => {
+  const map = {COMPLETE:["b-green","完成"], RUNNING:["b-blue","运行中"],
+    CRASHED:["b-violet","已崩溃可恢复"], ABORTED_DRIFT:["b-red","来源换版中止"],
+    ABORTED_BUDGET:["b-amber","预算耗尽中止"], ABORTED_BREAKER:["b-amber","熔断中止"],
+    ABORTED_ERROR:["b-gray","异常放弃"]};
+  const [cls,label] = map[s] || ["b-gray",s];
+  return `<span class="badge ${cls}">${label}</span>`;
+};
+const rangeBadge = s => {
+  const map = {PROVEN:["b-green","已证明完整"], SAMPLED_OK:["b-amber","抽检未见异常"],
+    GAP:["b-red","确认缺口"], SUSPECT:["b-violet","可疑待补抓"],
+    REFETCHED:["b-blue","已补抓待复核"], COLLECTED:["b-gray","已采集"],
+    NEW:["b-gray","未采集"]};
+  const [cls,label] = map[s] || ["b-gray",s];
+  return `<span class="badge ${cls}">${label}</span>`;
+};
+
+async function refresh(){
+  const state = await api("/api/state");
+  $("srcVer").textContent = state.source.version.version;
+  $("srcCnt").textContent = JSON.stringify(state.source.counters);
+  lastRuns = state.runs;
+  const tb = $("runsTable").querySelector("tbody");
+  tb.innerHTML = state.runs.map(r => `<tr>
+    <td class="mono">#${r.run_id}</td><td>${r.mode==="full"?"全量核验":"抽检 "+(r.sample_rate*100)+"%"}</td>
+    <td class="mono">${r.pinned_version||"-"}</td><td>${runBadge(r.status)}</td>
+    <td class="mono">${r.total??"-"}</td>
+    <td>${budgetCell(r.used_rows,r.budget_rows)}</td>
+    <td>${budgetCell(r.used_verify,r.budget_verify)}</td>
+    <td>${budgetCell(r.used_refetch,r.budget_refetch)}</td>
+    <td class="muted">${r.note||""}</td>
+    <td><button class="ghost" onclick="showDetail(${r.run_id})">详情</button></td>
+  </tr>`).join("");
+  $("runHint").textContent = state.recoverable_run_id
+    ? `run #${state.recoverable_run_id} 处于可恢复状态` : "无中断 RUN";
+
+  const pt = $("proofTable").querySelector("tbody");
+  pt.innerHTML = state.proofs.map(p => `<tr>
+    <td class="mono">#${p.proof_id}</td><td class="mono">#${p.run_id}</td>
+    <td><span class="badge ${p.kind==="COMPLETE"?"b-green":p.kind==="SAMPLED"?"b-amber":"b-red"}">${p.kind}</span></td>
+    <td><span class="badge ${p.status==="ACTIVE"?"b-blue":"b-gray"}">${p.status}</span></td>
+    <td class="mono">${p.version}</td><td class="mono">[${p.lo},${p.hi})</td>
+    <td class="muted">${JSON.stringify(p.detail_json)}</td></tr>`).join("");
+  if(state.runs.length) showDetail(state.runs[0].run_id, true);
+}
+
+async function showDetail(runId, silent){
+  try{
+    const s = await api("/api/runs/"+runId);
+    $("detailHint").textContent = `run #${runId} · ${s.run.pinned_version||""}`;
+    const groups = {PROVEN:[], SAMPLED_OK:[], GAP:[]};
+    const rt = $("rangeTable").querySelector("tbody");
+    rt.innerHTML = s.ranges.map(r => {
+      if(groups[r.state]) groups[r.state].push(`[${r.lo},${r.hi})`);
+      const dm = r.expected_digest
+        ? (r.actual_digest===r.expected_digest ? "✅ 一致" : "❌ 不一致") : "—";
+      return `<tr><td class="mono">[${r.lo},${r.hi})</td><td>${rangeBadge(r.state)}</td>
+        <td class="mono">${r.actual_count??"-"}/${r.expected_count??"-"}</td>
+        <td class="mono" style="font-size:11px">${dm}</td>
+        <td class="mono">${r.refetch_rounds}</td>
+        <td class="muted">${r.detail?JSON.stringify(r.detail):""}</td></tr>`;
+    }).join("");
+    $("cProven").textContent = groups.PROVEN.length;
+    $("cSampled").textContent = groups.SAMPLED_OK.length;
+    $("cGap").textContent = groups.GAP.length;
+    const chip = arr => arr.length
+      ? arr.map(x=>`<span class="badge b-gray mono">${x}</span>`).join("")
+      : `<span class="muted">无</span>`;
+    $("provenList").innerHTML = chip(groups.PROVEN);
+    $("sampledList").innerHTML = chip(groups.SAMPLED_OK);
+    $("gapList").innerHTML = chip(groups.GAP);
+  }catch(e){ if(!silent) toast(e.message,true); }
+}
+
+async function startRun(){
+  try{
+    await post("/api/runs", {mode:$("mode").value,
+      sample_rate:parseFloat($("sampleRate").value),
+      budgets:{rows:+$("bRows").value, verify:+$("bVerify").value,
+        refetch:+$("bRefetch").value}});
+    toast("RUN 完成"); refresh();
+  }catch(e){ toast("RUN 结束："+e.message, true); refresh(); }
+}
+async function resumeRun(){
+  const st = await api("/api/state");
+  if(!st.recoverable_run_id) return toast("没有可恢复的 RUN");
+  try{
+    await post(`/api/runs/${st.recoverable_run_id}/resume`, {});
+    toast("恢复执行完成");
+  }catch(e){ toast("恢复结束："+e.message, true); }
+  refresh();
+}
+async function discardRun(){
+  const st = await api("/api/state");
+  if(!st.recoverable_run_id) return toast("没有可放弃的中断 RUN");
+  await post(`/api/runs/${st.recoverable_run_id}/discard`, {});
+  toast("已放弃"); refresh();
+}
+async function baselineCheck(){
+  const st = await api("/api/state");
+  if(!st.runs.length) return toast("还没有 RUN");
+  const id = st.runs[0].run_id;
+  const r = await post("/api/baseline/"+id, {});
+  const bad = r.ranges.filter(x=>!x.consistent);
+  toast(`基准对照 run #${id}：${r.mismatch_ranges} 个区间与基准不一致，`
+    + (r.all_claims_correct ? "工作台全部结论与基准相符 ✅" : "存在结论与基准不符 ❌")
+    + (bad.length ? "\n缺口区间: "+bad.map(x=>`[${x.lo},${x.hi})缺${x.missing_ids.length}行`).join("; ") : ""));
+}
+async function setVersion(){
+  await post("/api/source/version", {version:$("setVer").value});
+  toast("已换版"); refresh();
+}
+function faultPayload(type){
+  const ids = $("fIds").value.trim()
+    ? $("fIds").value.split(",").map(x=>parseInt(x.trim(),10)) : undefined;
+  return {faults:[{type, offset:+$("fOffset").value, limit:+$("fLimit").value,
+    once:$("fOnce").value==="true", ...(ids?{ids}:{})}]};
+}
+async function injectDrop(){ await post("/api/source/faults", faultPayload("drop")); toast("已注入缺页"); refresh(); }
+async function injectStale(){ await post("/api/source/faults", faultPayload("stale")); toast("已注入旧缓存"); refresh(); }
+async function clearFaults(){ await post("/api/source/faults", {faults:[]}); toast("故障已清除"); refresh(); }
+async function setDrift(){
+  await post("/api/source/drift", {after_rows:+$("driftAfter").value,
+    version:$("driftVer").value});
+  toast("漂移计划已设置"); refresh();
+}
+async function resetCounters(){ await post("/api/source/reset_counters", {}); refresh(); }
+
+refresh();
+setInterval(refresh, 8000);
+</script>
+</body>
+</html>
